@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#f7f7fb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>StudyFlow</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f7f7fb; --bg2:#ffffff; --bg3:#f0f0f6;
+  --border:rgba(0,0,0,0.07); --border2:rgba(0,0,0,0.13);
+  --text:#1a1a2e; --text2:#6b6b8a; --text3:#a0a0bc;
+  --accent:#7c6ff7; --accent2:#5a4fd4;
+  --green:#22c98a; --orange:#f97316; --pink:#ec4899;
+  --yellow:#f59e0b; --red:#ef4444;
+  --radius:14px; --radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:var(--bg);font-family:'Outfit',sans-serif;color:var(--text);overflow:hidden;}
+
+/* ── 핸드폰 기본 레이아웃 ── */
+#app{display:flex;flex-direction:column;height:100dvh;max-width:430px;margin:0 auto;}
+.main-area{display:contents;}
+
+/* ── 태블릿 레이아웃 (갤럭시 탭 S10 FE 기준: 800px 이상) ── */
+@media(min-width:800px){
+  body{background:var(--bg3);}
+  #app{flex-direction:row;max-width:100%;height:100dvh;}
+
+  /* 좌측 사이드바 네비게이션 */
+  .tabbar{
+    flex-direction:column;width:210px;height:100%;
+    padding:52px 14px 24px;gap:6px;
+    border-top:none;border-right:1px solid var(--border);
+    flex-shrink:0;justify-content:flex-start;
+    background:var(--bg2);
+  }
+  .tab-item{flex-direction:row;justify-content:flex-start;gap:12px;padding:12px 16px;border-radius:var(--radius-sm);width:100%;}
+  .tab-item .tab-icon{font-size:20px;}
+  .tab-item .tab-label{font-size:13px;font-weight:500;}
+  .tab-item.active{background:rgba(124,111,247,0.1);}
+  .tab-item.active .tab-icon{transform:none;}
+
+  /* 우측 메인 영역 */
+  .main-area{display:flex;flex-direction:column;flex:1;height:100dvh;overflow:hidden;background:var(--bg);}
+  .sync-bar{padding:5px 28px;}
+  .header{padding:24px 28px 14px;}
+  .header-title{font-size:26px;}
+  .content{padding:0 28px 28px;}
+
+  /* 캘린더 - 달력/이벤트 나란히 */
+  #page-cal{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;}
+  #page-cal .card{margin-bottom:0;}
+  #page-cal .event-section{margin-top:0;}
+
+  /* 타이머 - 2열 */
+  #page-timer{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+  .active-timer-card{grid-column:1/-1;}
+  .stat-row{grid-column:1/-1;}
+  #linkedTodosCard{grid-column:1/-1;}
+  .timer-display{font-size:50px;}
+
+  /* 메모 - 2열 그리드 */
+  #page-memo{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}
+  .memo-list-item{margin-bottom:0;}
+
+  /* 모달 - 중앙 팝업으로 */
+  .modal-overlay{align-items:center;justify-content:center;}
+  .modal{border-radius:22px;max-width:480px;width:90%;padding:28px 28px 36px;}
+  @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+  /* 캔버스 */
+  .canvas-header{padding:28px 24px 10px;}
+  .page-nav{padding:8px 24px;}
+  .canvas-tools{padding:8px 24px;}
+
+  /* 로그인 */
+  .login-screen{padding:60px 40px;}
+  .login-title{font-size:30px;}
+}
+
+/* SYNC BAR */
+.sync-bar{display:flex;align-items:center;gap:6px;padding:5px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background 0.3s;}
+.sync-dot.connected{background:var(--green);}
+.sync-dot.syncing{background:var(--yellow);animation:pulse 1s infinite;}
+.sync-dot.error{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.sync-text{font-size:10px;color:var(--text3);flex:1;}
+.sync-uid{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;}
+
+/* HEADER */
+.header{padding:12px 16px 10px;flex-shrink:0;}
+.header-row{display:flex;justify-content:space-between;align-items:center;}
+.header-title{font-size:23px;font-weight:700;letter-spacing:-0.5px;}
+.header-sub{font-size:12px;color:var(--text2);margin-top:1px;}
+.header-btn{width:35px;height:35px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:19px;color:#fff;box-shadow:0 2px 8px rgba(124,111,247,0.3);transition:all 0.2s;}
+.header-btn:active{transform:scale(0.88);}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 14px 14px;-webkit-overflow-scrolling:touch;}
+.content::-webkit-scrollbar{display:none;}
+
+/* TABBAR */
+.tabbar{flex-shrink:0;display:flex;padding:7px 10px 22px;gap:3px;background:var(--bg2);border-top:1px solid var(--border);}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;border-radius:var(--radius-sm);cursor:pointer;transition:all 0.2s;}
+.tab-item .tab-icon{font-size:18px;transition:transform 0.2s;}
+.tab-item .tab-label{font-size:10px;color:var(--text3);font-weight:500;}
+.tab-item.active .tab-label{color:var(--accent);font-weight:600;}
+.tab-item.active .tab-icon{transform:scale(1.12);}
+.tab-item:active{transform:scale(0.9);}
+
+/* PAGES */
+.page{display:none;}.page.active{display:block;}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:13px;margin-bottom:9px;}
+.card-title{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:9px;}
+
+/* CALENDAR */
+.cal-month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.cal-month-title{font-size:16px;font-weight:600;}
+.cal-nav-btn{width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--text2);}
+.cal-nav-btn:active{background:var(--accent);color:#fff;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.cal-day-label{font-size:10px;color:var(--text3);text-align:center;padding:3px 0;font-weight:500;}
+.cal-day{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;font-size:12px;color:var(--text2);position:relative;transition:all 0.15s;}
+.cal-day:active{transform:scale(0.84);}
+.cal-day.today{background:var(--accent);color:#fff;font-weight:700;}
+.cal-day.selected:not(.today){background:var(--bg3);color:var(--text);border:1px solid var(--accent);}
+.cal-day.other-month{opacity:0.22;}
+.cal-day .dot-row{display:flex;gap:2px;position:absolute;bottom:2px;}
+.cal-day .dot{width:3px;height:3px;border-radius:50%;}
+.event-section{margin-top:4px;}
+.event-date-header{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:7px;}
+.event-item{display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:5px;}
+.event-color{width:4px;height:32px;border-radius:99px;flex-shrink:0;}
+.event-info{flex:1;}
+.event-name{font-size:13px;font-weight:500;color:var(--text);}
+.event-time{font-size:11px;color:var(--text2);margin-top:1px;}
+
+/* TODO */
+.cat-scroll{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:11px;scrollbar-width:none;}
+.cat-scroll::-webkit-scrollbar{display:none;}
+.cat-chip{flex-shrink:0;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:500;border:1px solid var(--border2);color:var(--text2);background:var(--bg2);cursor:pointer;white-space:nowrap;}
+.cat-chip.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.todo-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-left:3px solid;border-radius:var(--radius-sm);margin-bottom:7px;}
+.todo-item.done{opacity:0.45;}
+.todo-check{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border2);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;}
+.todo-check.checked{background:var(--green);border-color:var(--green);color:#fff;}
+.todo-info{flex:1;min-width:0;}
+.todo-text{font-size:13px;color:var(--text);font-weight:500;}
+.todo-text.done{text-decoration:line-through;color:var(--text3);}
+.todo-meta{display:flex;gap:5px;margin-top:3px;flex-wrap:wrap;align-items:center;}
+.todo-cat-badge{font-size:10px;padding:1px 7px;border-radius:99px;font-weight:500;}
+.todo-timer-badge{font-size:10px;padding:1px 7px;border-radius:99px;background:rgba(124,111,247,0.12);color:var(--accent);font-weight:500;}
+.todo-due{font-size:10px;color:var(--text3);}
+
+/* TIMER */
+.active-timer-card{background:linear-gradient(135deg,rgba(124,111,247,0.07),rgba(90,79,212,0.03));border:1px solid rgba(124,111,247,0.16);border-radius:var(--radius);padding:16px;margin-bottom:9px;text-align:center;}
+.timer-subject-label{font-size:12px;color:var(--accent);font-weight:600;margin-bottom:4px;}
+.timer-display{font-family:'JetBrains Mono',monospace;font-size:40px;font-weight:500;color:var(--text);letter-spacing:2px;margin-bottom:13px;}
+.timer-btns{display:flex;gap:9px;justify-content:center;}
+.timer-btn{padding:8px 18px;border-radius:99px;font-size:13px;font-weight:600;font-family:'Outfit',sans-serif;border:none;cursor:pointer;}
+.timer-btn.primary{background:var(--accent);color:#fff;}
+.timer-btn.secondary{background:var(--bg3);color:var(--text2);border:1px solid var(--border2);}
+.subj-row{display:flex;align-items:center;gap:9px;padding:10px 0;border-bottom:1px solid var(--border);}
+.subj-row:last-child{border-bottom:none;}
+.subj-color-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.subj-info{flex:1;min-width:0;}
+.subj-name{font-size:13px;font-weight:500;color:var(--text);}
+.subj-bar-wrap{margin-top:3px;height:3px;background:var(--bg3);border-radius:99px;overflow:hidden;}
+.subj-bar-fill{height:100%;border-radius:99px;transition:width 0.5s ease;}
+.subj-time-label{font-size:11px;font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--text2);}
+.subj-start-btn{padding:4px 10px;border-radius:99px;font-size:11px;font-weight:600;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);cursor:pointer;}
+.subj-start-btn.active-subj{background:var(--accent);border-color:var(--accent);color:#fff;}
+.stat-row{display:flex;gap:7px;margin-bottom:9px;}
+.stat-box{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 10px;}
+.stat-label{font-size:10px;color:var(--text3);font-weight:500;}
+.stat-val{font-size:15px;font-weight:700;color:var(--text);margin-top:2px;font-family:'JetBrains Mono',monospace;}
+
+/* MEMO LIST */
+.memo-list-item{display:flex;align-items:stretch;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden;cursor:pointer;transition:all 0.15s;}
+.memo-list-item:active{opacity:0.72;transform:scale(0.98);}
+.memo-accent-bar{width:4px;flex-shrink:0;}
+.memo-content{padding:10px 12px;flex:1;min-width:0;}
+.memo-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;}
+.memo-meta{display:flex;gap:8px;align-items:center;}
+.memo-pages{font-size:10px;color:var(--accent);font-weight:500;}
+.memo-date{font-size:10px;color:var(--text3);}
+.memo-delete-btn{padding:0 13px;display:flex;align-items:center;color:var(--text3);font-size:15px;}
+
+/* CANVAS PAGE */
+.canvas-page{position:fixed;inset:0;background:#f7f7fb;z-index:100;display:none;flex-direction:column;}
+.canvas-page.open{display:flex;}
+.canvas-header{padding:46px 14px 9px;display:flex;align-items:center;gap:9px;flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--border);}
+.canvas-back{font-size:20px;cursor:pointer;color:var(--text2);padding:3px 5px;}
+.canvas-title-input{flex:1;background:none;border:none;outline:none;font-size:15px;font-weight:600;color:var(--text);font-family:'Outfit',sans-serif;}
+.canvas-save-btn{padding:6px 14px;border-radius:99px;background:var(--accent);color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:'Outfit',sans-serif;}
+
+/* PAGE NAV */
+.page-nav{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;}
+.pnav-btn{width:26px;height:26px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text2);cursor:pointer;flex-shrink:0;}
+.pnav-btn:active{background:var(--accent);color:#fff;}
+.pnav-btn.disabled{opacity:0.28;pointer-events:none;}
+.page-indicator{flex:1;text-align:center;font-size:12px;color:var(--text2);font-weight:500;}
+.page-add-btn{padding:4px 11px;border-radius:99px;background:var(--accent);color:#fff;font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:'Outfit',sans-serif;}
+.page-del-btn{padding:4px 9px;border-radius:99px;background:var(--bg3);color:var(--red);font-size:11px;font-weight:600;border:1px solid rgba(239,68,68,0.18);cursor:pointer;font-family:'Outfit',sans-serif;}
+
+/* TOOLS */
+.canvas-tools{display:flex;align-items:center;gap:8px;padding:7px 14px;flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;}
+.canvas-tools::-webkit-scrollbar{display:none;}
+.pen-size{border-radius:50%;background:var(--text);cursor:pointer;flex-shrink:0;border:2px solid transparent;transition:transform 0.15s;}
+.pen-size.selected{border-color:var(--accent);transform:scale(1.22);}
+.color-dot-tool{width:20px;height:20px;border-radius:50%;cursor:pointer;flex-shrink:0;border:2px solid transparent;transition:transform 0.15s;}
+.color-dot-tool.selected{border-color:var(--accent);transform:scale(1.15);}
+.tool-sep{width:1px;height:20px;background:var(--border2);flex-shrink:0;}
+.eraser-btn{padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600;background:var(--bg3);color:var(--text2);border:1px solid var(--border2);cursor:pointer;flex-shrink:0;}
+.eraser-btn.active{background:var(--orange);color:#fff;border-color:var(--orange);}
+.clear-btn{padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600;background:var(--bg3);color:var(--red);border:1px solid rgba(239,68,68,0.18);cursor:pointer;flex-shrink:0;}
+.canvas-wrap{flex:1;position:relative;overflow:hidden;}
+#drawCanvas{position:absolute;inset:0;width:100%;height:100%;background:#ffffff;touch-action:none;}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.46);z-index:200;display:none;align-items:flex-end;backdrop-filter:blur(3px);}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--bg2);border-radius:22px 22px 0 0;padding:20px 16px 34px;width:100%;border-top:1px solid var(--border2);animation:slideUp 0.26s ease;max-height:88vh;overflow-y:auto;}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:16px;}
+.modal-close{float:right;font-size:20px;color:var(--text3);cursor:pointer;}
+.form-group{margin-bottom:12px;}
+.form-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px;display:block;}
+.form-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:9px 12px;font-size:14px;color:var(--text);font-family:'Outfit',sans-serif;outline:none;}
+.form-input:focus{border-color:var(--accent);}
+.form-row{display:flex;gap:8px;}.form-row .form-group{flex:1;}
+.toggle-row{display:flex;gap:7px;}
+.toggle-btn{flex:1;padding:8px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;text-align:center;}
+.toggle-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.cat-select-row{display:flex;gap:6px;flex-wrap:wrap;}
+.cat-select-chip{padding:5px 12px;border-radius:99px;font-size:12px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;}
+.cat-select-chip.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.submit-btn{width:100%;padding:13px;border-radius:var(--radius);background:var(--accent);color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:'Outfit',sans-serif;margin-top:4px;}
+.color-pick-row{display:flex;gap:8px;flex-wrap:wrap;}
+.color-pick{width:25px;height:25px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform 0.15s;}
+.color-pick.selected{border-color:#333;transform:scale(1.14);}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:34px 20px;color:var(--text3);}
+.empty-icon{font-size:36px;margin-bottom:8px;}
+.empty-text{font-size:13px;}
+
+/* TOAST */
+.toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(14px);background:var(--text);border-radius:99px;padding:8px 17px;font-size:13px;color:#fff;opacity:0;transition:all 0.26s;z-index:300;white-space:nowrap;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* LOGIN */
+.login-screen{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;pointer-events:all;}
+.login-logo{font-size:52px;margin-bottom:10px;}
+.login-title{font-size:26px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.login-sub{font-size:14px;color:var(--text2);text-align:center;margin-bottom:34px;line-height:1.6;}
+.login-btn{width:100%;padding:14px;border-radius:var(--radius);background:var(--accent);color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:'Outfit',sans-serif;margin-bottom:10px;pointer-events:all;position:relative;z-index:501;}
+.login-btn.guest{background:var(--bg3);color:var(--text2);border:1px solid var(--border2);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-logo">📚</div>
+  <div class="login-title">StudyFlow</div>
+  <div class="login-sub">구글 계정으로 로그인하면<br>핸드폰 ↔ 태블릿 자동 연동돼요</div>
+  <button class="login-btn" id="googleLoginBtn" onclick="handleGoogleLogin()">🔑 구글로 로그인</button>
+  <button class="login-btn guest" id="guestLoginBtn" onclick="handleGuestLogin()">로그인 없이 사용하기</button>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none;">
+  <!-- 태블릿: tabbar가 사이드바로 올라가고 main-area가 우측 메인 -->
+  <div class="main-area">
+  <div class="sync-bar">
+    <div class="sync-dot" id="syncDot"></div>
+    <div class="sync-text" id="syncText">연결 중...</div>
+    <div class="sync-uid" id="syncUid"></div>
+  </div>
+  <div class="header">
+    <div class="header-row">
+      <div>
+        <div class="header-title" id="headerTitle">캘린더</div>
+        <div class="header-sub" id="headerSub"></div>
+      </div>
+      <div class="header-btn" onclick="openAddModal()">＋</div>
+    </div>
+  </div>
+  <div class="content" id="mainContent">
+    <!-- CALENDAR -->
+    <div class="page active" id="page-cal">
+      <div class="card">
+        <div class="cal-month-nav">
+          <div class="cal-nav-btn" onclick="changeMonth(-1)">‹</div>
+          <div class="cal-month-title" id="calMonthTitle"></div>
+          <div class="cal-nav-btn" onclick="changeMonth(1)">›</div>
+        </div>
+        <div class="cal-grid" id="calDayLabels"></div>
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+      <div class="event-section">
+        <div class="event-date-header" id="eventDateHeader"></div>
+        <div id="eventList"></div>
+      </div>
+    </div>
+    <!-- TODO -->
+    <div class="page" id="page-todo">
+      <div class="cat-scroll" id="catScroll"></div>
+      <div id="todoList"></div>
+    </div>
+    <!-- TIMER -->
+    <div class="page" id="page-timer">
+      <div class="active-timer-card">
+        <div class="timer-subject-label" id="timerSubjectLabel">과목을 선택하세요</div>
+        <div class="timer-display" id="timerDisplay">00:00:00</div>
+        <div class="timer-btns">
+          <div class="timer-btn secondary" onclick="resetTimer()">초기화</div>
+          <div class="timer-btn primary" id="timerToggleBtn" onclick="toggleTimer()">시작</div>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-box"><div class="stat-label">오늘</div><div class="stat-val" id="statToday">0h 0m</div></div>
+        <div class="stat-box"><div class="stat-label">이번 주</div><div class="stat-val" id="statWeek">0h 0m</div></div>
+        <div class="stat-box"><div class="stat-label">연속</div><div class="stat-val" id="statStreak">0일</div></div>
+      </div>
+      <div class="card"><div class="card-title">과목별 기록</div><div id="subjList"></div></div>
+      <div class="card" id="linkedTodosCard" style="display:none;"><div class="card-title">⏱ 타이머 연동 할일</div><div id="linkedTodosList"></div></div>
+    </div>
+    <!-- MEMO -->
+    <div class="page" id="page-memo"><div id="memoList"></div></div>
+  </div>
+  </div><!-- /main-area -->
+  <div class="tabbar">
+    <div class="tab-item active" data-tab="cal" onclick="switchTab('cal')"><div class="tab-icon">📅</div><div class="tab-label">캘린더</div></div>
+    <div class="tab-item" data-tab="todo" onclick="switchTab('todo')"><div class="tab-icon">✅</div><div class="tab-label">할 일</div></div>
+    <div class="tab-item" data-tab="timer" onclick="switchTab('timer')"><div class="tab-icon">⏱</div><div class="tab-label">타이머</div></div>
+    <div class="tab-item" data-tab="memo" onclick="switchTab('memo')"><div class="tab-icon">✏️</div><div class="tab-label">메모</div></div>
+  </div>
+</div>
+
+<!-- CANVAS PAGE -->
+<div class="canvas-page" id="canvasPage">
+  <div class="canvas-header">
+    <div class="canvas-back" onclick="closeCanvas()">←</div>
+    <input class="canvas-title-input" id="canvasTitleInput" placeholder="메모 제목..."/>
+    <button class="canvas-save-btn" onclick="saveMemo()">저장</button>
+  </div>
+  <div class="page-nav">
+    <div class="pnav-btn disabled" id="prevPageBtn" onclick="goToPage(currentCanvasPage-1)">‹</div>
+    <div class="page-indicator" id="pageIndicator">1 / 1</div>
+    <div class="pnav-btn disabled" id="nextPageBtn" onclick="goToPage(currentCanvasPage+1)">›</div>
+    <button class="page-add-btn" onclick="addCanvasPage()">+ 페이지</button>
+    <button class="page-del-btn" onclick="deleteCanvasPage()">삭제</button>
+  </div>
+  <div class="canvas-tools">
+    <div class="pen-size selected" style="width:6px;height:6px;" onclick="selectPenSize(this,2)"></div>
+    <div class="pen-size" style="width:10px;height:10px;" onclick="selectPenSize(this,4)"></div>
+    <div class="pen-size" style="width:14px;height:14px;" onclick="selectPenSize(this,7)"></div>
+    <div class="tool-sep"></div>
+    <div class="color-dot-tool selected" style="background:#1a1a2e;" onclick="selectColor(this,'#1a1a2e')"></div>
+    <div class="color-dot-tool" style="background:#7c6ff7;" onclick="selectColor(this,'#7c6ff7')"></div>
+    <div class="color-dot-tool" style="background:#22c98a;" onclick="selectColor(this,'#22c98a')"></div>
+    <div class="color-dot-tool" style="background:#f97316;" onclick="selectColor(this,'#f97316')"></div>
+    <div class="color-dot-tool" style="background:#ec4899;" onclick="selectColor(this,'#ec4899')"></div>
+    <div class="color-dot-tool" style="background:#ef4444;" onclick="selectColor(this,'#ef4444')"></div>
+    <div class="tool-sep"></div>
+    <div class="eraser-btn" id="eraserBtn" onclick="toggleEraser()">지우개</div>
+    <div class="clear-btn" onclick="clearCanvas()">현재 페이지 지우기</div>
+  </div>
+  <div class="canvas-wrap"><canvas id="drawCanvas"></canvas></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <span class="modal-close" onclick="closeModalDirect()">✕</span>
+    <div class="modal-title" id="modalTitle"></div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- FIREBASE MODULE -->
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getAuth,GoogleAuthProvider,signInWithRedirect,getRedirectResult,signInAnonymously,onAuthStateChanged}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import{getFirestore,doc,setDoc,getDoc,onSnapshot}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app=initializeApp({
+  apiKey:"AIzaSyASlQyKWfILlME9ty1WK8FqlUKT3NTX-2Y",
+  authDomain:"studyflow-cd31f.firebaseapp.com",
+  projectId:"studyflow-cd31f",
+  storageBucket:"studyflow-cd31f.firebasestorage.app",
+  messagingSenderId:"270398949727",
+  appId:"1:270398949727:web:b1914134c08452d24aceea"
+});
+const auth=getAuth(app);
+const db=getFirestore(app);
+let uid=null,syncT=null;
+
+window.signInWithGoogle=async()=>{
+  try{
+    const provider=new GoogleAuthProvider();
+    provider.setCustomParameters({prompt:'select_account'});
+    // 폰에서 팝업이 막히므로 리디렉션 방식 사용
+    await signInWithRedirect(auth,provider);
+  }catch(e){
+    if(window.showToast)showToast('로그인 실패: '+e.message);
+    else alert('로그인 실패: '+e.message);
+  }
+};
+window.signInAnonymously_=async()=>{
+  try{await signInAnonymously(auth);}
+  catch(e){if(window.showToast)showToast('오류: '+e.message);else alert(e.message);}
+};
+
+// 버튼 이벤트는 onclick으로 직접 연결됨
+
+function setSyncStatus(s,t){document.getElementById('syncDot').className='sync-dot '+s;document.getElementById('syncText').textContent=t;}
+
+// 리디렉션 후 돌아왔을 때 결과 처리
+try{
+  const result=await getRedirectResult(auth);
+  if(result&&result.user){
+    console.log('리디렉션 로그인 성공:', result.user.email);
+  }
+}catch(e){
+  console.error('리디렉션 결과 처리 오류:', e);
+  if(window.showToast)showToast('로그인 오류: '+e.message);
+}
+
+onAuthStateChanged(auth,async(user)=>{
+  if(user){
+    uid=user.uid;
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    document.getElementById('syncUid').textContent=user.isAnonymous?'비로그인':(user.email||uid.slice(0,6));
+    setSyncStatus('syncing','데이터 불러오는 중...');
+    // load main data
+    try{
+      const snap=await getDoc(doc(db,'users',uid,'data','main'));
+      if(snap.exists()){const d=snap.data();state.events=d.events||[];state.todos=d.todos||[];state.subjects=d.subjects||[];state.categories=d.categories||state.categories;state.timerLog=d.timerLog||{};}
+      const msnap=await getDoc(doc(db,'users',uid,'data','memos'));
+      if(msnap.exists())state.memos=msnap.data().list||[];
+      setSyncStatus('connected','연동됨');
+    }catch(e){setSyncStatus('error','불러오기 실패');}
+    // live listener
+    onSnapshot(doc(db,'users',uid,'data','main'),(snap)=>{
+      if(!snap.exists())return;
+      const d=snap.data();state.events=d.events||[];state.todos=d.todos||[];state.subjects=d.subjects||[];state.categories=d.categories||state.categories;state.timerLog=d.timerLog||{};
+      refreshCurrentTab();setSyncStatus('connected','연동됨');
+    });
+    onSnapshot(doc(db,'users',uid,'data','memos'),(snap)=>{
+      if(!snap.exists())return;
+      state.memos=snap.data().list||[];
+      if(currentTab==='memo')renderMemos();
+    });
+    initApp();
+  } else {
+    document.getElementById('loginScreen').style.display='flex';
+    document.getElementById('app').style.display='none';
+  }
+});
+
+window.saveToFirebase=()=>{
+  if(!uid)return;
+  setSyncStatus('syncing','저장 중...');
+  clearTimeout(syncT);
+  syncT=setTimeout(async()=>{
+    try{
+      await setDoc(doc(db,'users',uid,'data','main'),{events:state.events,todos:state.todos,subjects:state.subjects,categories:state.categories,timerLog:state.timerLog,updatedAt:new Date().toISOString()});
+      setSyncStatus('connected','저장됨');
+    }catch(e){setSyncStatus('error','저장 실패');}
+  },900);
+};
+
+window.saveMemoListToFirebase=async()=>{
+  if(!uid)return;
+  try{
+    const list=state.memos.map(m=>({id:m.id,title:m.title,pageCount:(m.pages||[]).length,updatedAt:m.updatedAt}));
+    await setDoc(doc(db,'users',uid,'data','memos'),{list});
+  }catch(e){console.error(e);}
+};
+
+window.saveMemoDocToFirebase=async(memo)=>{
+  if(!uid)return;
+  try{await setDoc(doc(db,'users',uid,'memos',memo.id),{id:memo.id,title:memo.title,pages:memo.pages||[],updatedAt:memo.updatedAt});}
+  catch(e){console.error(e);}
+};
+
+window.loadMemoPages=async(memoId)=>{
+  if(!uid)return null;
+  try{const snap=await getDoc(doc(db,'users',uid,'memos',memoId));if(snap.exists())return snap.data().pages||[];}
+  catch(e){}return null;
+};
+</script>
+
+<!-- MAIN JS -->
+<script>
+// 로그인 버튼 래퍼 - 모듈 밖에서 onclick으로 호출 가능
+function handleGoogleLogin(){
+  console.log('구글 로그인 버튼 클릭됨');
+  if(window.signInWithGoogle){
+    window.signInWithGoogle();
+  } else {
+    // Firebase 모듈 아직 로딩 안됨 - 직접 리디렉션
+    alert('Firebase 로딩 중... 잠시 후 다시 눌러주세요.');
+  }
+}
+function handleGuestLogin(){
+  console.log('비로그인 버튼 클릭됨');
+  if(window.signInAnonymously_){
+    window.signInAnonymously_();
+  } else {
+    alert('Firebase 로딩 중... 잠시 후 다시 눌러주세요.');
+  }
+}
+
+let state={events:[],todos:[],subjects:[],memos:[],categories:['학교','운동','생활','개인'],timerLog:{}};
+let currentTab='cal';
+
+function save(){if(window.saveToFirebase)window.saveToFirebase();}
+function refreshCurrentTab(){if(currentTab==='cal')renderCalendar();else if(currentTab==='todo')renderTodo();else if(currentTab==='timer')renderTimer();else if(currentTab==='memo')renderMemos();}
+function initApp(){renderCalendar();updateTimerDisplay();const n=new Date();document.getElementById('headerSub').textContent=`${n.getFullYear()}년 ${n.getMonth()+1}월 ${n.getDate()}일`;}
+
+// TABS
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.tab-item').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+tab));
+  document.getElementById('headerTitle').textContent={cal:'캘린더',todo:'할 일',timer:'공부 타이머',memo:'손글씨 메모'}[tab];
+  document.getElementById('mainContent').scrollTop=0;
+  refreshCurrentTab();
+}
+function openAddModal(){if(currentTab==='cal')openEventModal();else if(currentTab==='todo')openTodoModal();else if(currentTab==='timer')openSubjectModal();else openCanvas(null);}
+
+// CALENDAR
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),selectedDate=new Date();
+const COLORS=['#7c6ff7','#22c98a','#f97316','#ec4899','#f59e0b','#ef4444','#60a5fa'];
+let pickedColor=COLORS[0];
+
+function renderCalendar(){
+  const today=new Date(),firstDay=new Date(calYear,calMonth,1).getDay(),daysInMonth=new Date(calYear,calMonth+1,0).getDate(),daysInPrev=new Date(calYear,calMonth,0).getDate();
+  const months='1월 2월 3월 4월 5월 6월 7월 8월 9월 10월 11월 12월'.split(' ');
+  document.getElementById('calMonthTitle').textContent=`${calYear}년 ${months[calMonth]}`;
+  document.getElementById('calDayLabels').innerHTML=['일','월','화','수','목','금','토'].map((d,i)=>`<div class="cal-day-label" style="color:${i===0?'#ef4444':i===6?'#60a5fa':''}">${d}</div>`).join('');
+  let html='';
+  for(let i=firstDay-1;i>=0;i--)html+=`<div class="cal-day other-month">${daysInPrev-i}</div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=fmtDate(new Date(calYear,calMonth,d));
+    const isToday=today.getFullYear()===calYear&&today.getMonth()===calMonth&&today.getDate()===d;
+    const isSel=selectedDate.getFullYear()===calYear&&selectedDate.getMonth()===calMonth&&selectedDate.getDate()===d;
+    const dots=state.events.filter(e=>e.date===ds).slice(0,3).map(e=>`<div class="dot" style="background:${e.color}"></div>`).join('');
+    html+=`<div class="cal-day ${isToday?'today':isSel?'selected':''}" onclick="selectCalDay(${calYear},${calMonth},${d})">${d}${dots?`<div class="dot-row">${dots}</div>`:''}</div>`;
+  }
+  const rem=(7-(firstDay+daysInMonth)%7)%7;
+  for(let d=1;d<=rem;d++)html+=`<div class="cal-day other-month">${d}</div>`;
+  document.getElementById('calGrid').innerHTML=html;
+  renderEvents();
+}
+function selectCalDay(y,m,d){selectedDate=new Date(y,m,d);renderCalendar();}
+function changeMonth(dir){calMonth+=dir;if(calMonth>11){calMonth=0;calYear++;}if(calMonth<0){calMonth=11;calYear--;}renderCalendar();}
+function renderEvents(){
+  const ds=fmtDate(selectedDate);
+  const days=['일','월','화','수','목','금','토'];
+  document.getElementById('eventDateHeader').textContent=`${selectedDate.getMonth()+1}월 ${selectedDate.getDate()}일 (${days[selectedDate.getDay()]})`;
+  const evs=state.events.filter(e=>e.date===ds).sort((a,b)=>a.time.localeCompare(b.time));
+  document.getElementById('eventList').innerHTML=evs.length?evs.map(e=>`<div class="event-item"><div class="event-color" style="background:${e.color}"></div><div class="event-info"><div class="event-name">${e.title}</div><div class="event-time">${e.time||'하루 종일'}</div></div><div style="color:var(--text3);cursor:pointer;padding:4px;" onclick="deleteEvent('${e.id}')">🗑</div></div>`).join(''):`<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">이 날 일정이 없어요</div></div>`;
+}
+function deleteEvent(id){state.events=state.events.filter(e=>e.id!==id);save();renderCalendar();}
+function pickColor(el,c){pickedColor=c;document.querySelectorAll('.color-pick').forEach(e=>e.classList.remove('selected'));el.classList.add('selected');}
+function openEventModal(){
+  const ds=fmtDate(new Date());
+  showModal('새 일정 추가',`<div class="form-group"><label class="form-label">일정 이름</label><input class="form-input" id="evTitle" placeholder="예: 운영체제 중간고사"></div><div class="form-row"><div class="form-group"><label class="form-label">날짜</label><input class="form-input" id="evDate" type="date" value="${ds}"></div><div class="form-group"><label class="form-label">시간</label><input class="form-input" id="evTime" type="time"></div></div><div class="form-group"><label class="form-label">색상</label><div class="color-pick-row">${COLORS.map((c,i)=>`<div class="color-pick${i===0?' selected':''}" style="background:${c}" onclick="pickColor(this,'${c}')"></div>`).join('')}</div></div><button class="submit-btn" onclick="addEvent()">일정 추가</button>`);
+}
+function addEvent(){const title=document.getElementById('evTitle').value.trim(),date=document.getElementById('evDate').value,time=document.getElementById('evTime').value;if(!title||!date){showToast('제목과 날짜를 입력해주세요');return;}state.events.push({id:'e'+Date.now(),title,date,time,color:pickedColor});save();closeModalDirect();renderCalendar();showToast('일정 추가됨 📅');}
+
+// TODO
+let activeCat='전체',modalCat='',hasTimer=false;
+function renderTodo(){
+  const cats=['전체',...state.categories];
+  document.getElementById('catScroll').innerHTML=cats.map(c=>`<div class="cat-chip${c===activeCat?' active':''}" onclick="setCat('${c}')">${c}</div>`).join('')+`<div class="cat-chip" onclick="openCatModal()">＋</div>`;
+  const filtered=activeCat==='전체'?state.todos:state.todos.filter(t=>t.category===activeCat);
+  const CB={'학교':'rgba(124,111,247,0.11)','운동':'rgba(34,201,138,0.11)','생활':'rgba(245,158,11,0.11)','개인':'rgba(236,72,153,0.11)'};
+  const CT={'학교':'#7c6ff7','운동':'#22c98a','생활':'#f59e0b','개인':'#ec4899'};
+  document.getElementById('todoList').innerHTML=filtered.length?filtered.map(t=>`<div class="todo-item${t.done?' done':''}" style="border-left-color:${CT[t.category]||'var(--border2)'}"><div class="todo-check${t.done?' checked':''}" onclick="toggleTodo('${t.id}')">${t.done?'✓':''}</div><div class="todo-info" onclick="toggleTodo('${t.id}')"><div class="todo-text${t.done?' done':''}">${t.title}</div><div class="todo-meta"><span class="todo-cat-badge" style="background:${CB[t.category]||'var(--bg3)'};color:${CT[t.category]||'var(--text2)'}">${t.category}</span>${t.hasTimer?`<span class="todo-timer-badge">⏱ ${t.timerGoal}분</span>`:''}${t.dueDate?`<span class="todo-due">📅 ${t.dueDate}</span>`:''}</div></div><div style="color:var(--text3);cursor:pointer;padding:4px;" onclick="deleteTodo('${t.id}')">🗑</div></div>`).join(''):`<div class="empty-state"><div class="empty-icon">🎉</div><div class="empty-text">할 일이 없어요!</div></div>`;
+}
+function setCat(c){activeCat=c;renderTodo();}
+function toggleTodo(id){const t=state.todos.find(t=>t.id===id);if(t){t.done=!t.done;save();renderTodo();}}
+function deleteTodo(id){state.todos=state.todos.filter(t=>t.id!==id);save();renderTodo();}
+function openTodoModal(){
+  showModal('새 할일 추가',`<div class="form-group"><label class="form-label">할일 내용</label><input class="form-input" id="todoTitle" placeholder="예: 운영체제 Chapter 5 읽기"></div><div class="form-group"><label class="form-label">카테고리</label><div class="cat-select-row">${state.categories.map((c,i)=>`<div class="cat-select-chip${i===0?' active':''}" onclick="selectModalCat(this,'${c}')">${c}</div>`).join('')}</div></div><div class="form-group"><label class="form-label">마감일 (선택)</label><input class="form-input" id="todoDue" type="date"></div><div class="form-group"><label class="form-label">타이머 연동</label><div class="toggle-row"><div class="toggle-btn active" id="timerNo" onclick="setTimerToggle(false)">없음</div><div class="toggle-btn" id="timerYes" onclick="setTimerToggle(true)">⏱ 타이머 추가</div></div></div><div id="timerGoalWrap" style="display:none;" class="form-group"><label class="form-label">목표 시간 (분)</label><input class="form-input" id="timerGoalInput" type="number" placeholder="60"></div><button class="submit-btn" onclick="addTodo()">할일 추가</button>`);
+  modalCat=state.categories[0]||'';hasTimer=false;
+}
+function selectModalCat(el,c){modalCat=c;document.querySelectorAll('.cat-select-chip').forEach(e=>e.classList.remove('active'));el.classList.add('active');}
+function setTimerToggle(v){hasTimer=v;document.getElementById('timerNo').classList.toggle('active',!v);document.getElementById('timerYes').classList.toggle('active',v);document.getElementById('timerGoalWrap').style.display=v?'block':'none';}
+function addTodo(){const title=document.getElementById('todoTitle').value.trim();if(!title){showToast('할일 내용을 입력해주세요');return;}const goal=hasTimer?(document.getElementById('timerGoalInput').value||30):null;state.todos.push({id:'t'+Date.now(),title,category:modalCat||state.categories[0]||'기타',dueDate:document.getElementById('todoDue').value,hasTimer,timerGoal:goal,done:false});save();closeModalDirect();renderTodo();showToast('할일 추가됨 ✅');}
+function openCatModal(){showModal('카테고리 추가',`<div class="form-group"><label class="form-label">이름</label><input class="form-input" id="catNameInput" placeholder="예: 취미"></div><button class="submit-btn" onclick="addCategory()">추가</button>`);}
+function addCategory(){const n=document.getElementById('catNameInput').value.trim();if(n&&!state.categories.includes(n)){state.categories.push(n);save();}closeModalDirect();renderTodo();}
+
+// TIMER
+let timerInterval=null,timerRunning=false,timerSecs=0,activeSubjectId=null;
+const todayStr=()=>new Date().toISOString().slice(0,10);
+function renderTimer(){
+  const total=Object.values(state.timerLog).reduce((s,d)=>s+(d[todayStr()]||0),0);
+  document.getElementById('statToday').textContent=secsToHM(total);
+  document.getElementById('statWeek').textContent=secsToHM(getWeekTotal());
+  document.getElementById('statStreak').textContent='0일';
+  if(!state.subjects.length){document.getElementById('subjList').innerHTML=`<div class="empty-state"><div class="empty-icon">📚</div><div class="empty-text">+ 버튼으로 과목을 추가해보세요</div></div>`;}
+  else{const maxS=Math.max(...state.subjects.map(s=>s.totalSecs),1);document.getElementById('subjList').innerHTML=state.subjects.map(s=>{const isActive=s.id===activeSubjectId,pct=Math.round(s.totalSecs/maxS*100);return`<div class="subj-row"><div class="subj-color-dot" style="background:${s.color}"></div><div class="subj-info"><div class="subj-name">${s.name}</div><div class="subj-bar-wrap"><div class="subj-bar-fill" style="width:${pct}%;background:${s.color}"></div></div></div><div class="subj-time-label">${secsToHM(s.totalSecs)}</div><div class="subj-start-btn${isActive?' active-subj':''}" onclick="selectSubject('${s.id}')">${isActive&&timerRunning?'⏸ 중지':'▶ 시작'}</div><div style="color:var(--text3);font-size:14px;padding:4px 0 4px 8px;cursor:pointer;" onclick="deleteSubject('${s.id}')">🗑</div></div>`;}).join('');}
+  const linked=state.todos.filter(t=>t.hasTimer&&!t.done);
+  const card=document.getElementById('linkedTodosCard');
+  if(linked.length){card.style.display='block';document.getElementById('linkedTodosList').innerHTML=linked.map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;flex:1;">${t.title}</span><span style="font-size:11px;color:var(--accent);">⏱ ${t.timerGoal}분 목표</span></div>`).join('');}
+  else card.style.display='none';
+}
+function selectSubject(id){if(activeSubjectId===id&&timerRunning)pauseTimer();else{activeSubjectId=id;const s=state.subjects.find(s=>s.id===id);document.getElementById('timerSubjectLabel').textContent=s?s.name:'';if(!timerRunning)startTimer();else renderTimer();}}
+function startTimer(){if(!activeSubjectId){showToast('먼저 과목을 선택해주세요');return;}timerRunning=true;document.getElementById('timerToggleBtn').textContent='일시정지';timerInterval=setInterval(()=>{timerSecs++;const s=state.subjects.find(s=>s.id===activeSubjectId);if(s){s.totalSecs++;if(!state.timerLog[activeSubjectId])state.timerLog[activeSubjectId]={};state.timerLog[activeSubjectId][todayStr()]=(state.timerLog[activeSubjectId][todayStr()]||0)+1;}updateTimerDisplay();if(timerSecs%30===0){save();renderTimer();}},1000);renderTimer();}
+function pauseTimer(){timerRunning=false;clearInterval(timerInterval);document.getElementById('timerToggleBtn').textContent='계속';save();renderTimer();}
+function toggleTimer(){if(timerRunning)pauseTimer();else startTimer();}
+function resetTimer(){pauseTimer();timerSecs=0;updateTimerDisplay();}
+function updateTimerDisplay(){const h=String(Math.floor(timerSecs/3600)).padStart(2,'0'),m=String(Math.floor(timerSecs%3600/60)).padStart(2,'0'),s=String(timerSecs%60).padStart(2,'0');document.getElementById('timerDisplay').textContent=`${h}:${m}:${s}`;}
+function secsToHM(s){return`${Math.floor(s/3600)}h ${Math.floor(s%3600/60)}m`;}
+function getWeekTotal(){const now=new Date();let t=0;for(let i=0;i<7;i++){const d=new Date(now);d.setDate(now.getDate()-i);Object.values(state.timerLog).forEach(l=>t+=(l[d.toISOString().slice(0,10)]||0));}return t;}
+function openSubjectModal(){showModal('과목 추가',`<div class="form-group"><label class="form-label">과목명</label><input class="form-input" id="subjNameInput" placeholder="예: 운영체제"></div><div class="form-group"><label class="form-label">색상</label><div class="color-pick-row">${COLORS.map((c,i)=>`<div class="color-pick${i===0?' selected':''}" style="background:${c}" onclick="pickColor(this,'${c}')"></div>`).join('')}</div></div><button class="submit-btn" onclick="addSubject()">추가</button>`);}
+function addSubject(){const n=document.getElementById('subjNameInput').value.trim();if(!n)return;state.subjects.push({id:'s'+Date.now(),name:n,color:pickedColor,totalSecs:0});save();closeModalDirect();renderTimer();}
+function deleteSubject(id){if(activeSubjectId===id){pauseTimer();activeSubjectId=null;timerSecs=0;updateTimerDisplay();document.getElementById('timerSubjectLabel').textContent='과목을 선택하세요';}state.subjects=state.subjects.filter(s=>s.id!==id);delete state.timerLog[id];save();renderTimer();showToast('과목 삭제됨');}
+
+// MEMO (MULTI-PAGE)
+let editingMemoId=null,canvasPages=[],currentCanvasPage=0;
+let penSize=2,penColor='#1a1a2e',isEraser=false,drawing=false,lastX=0,lastY=0;
+
+function renderMemos(){
+  if(!state.memos.length){document.getElementById('memoList').innerHTML=`<div class="empty-state"><div class="empty-icon">✏️</div><div class="empty-text">+ 버튼으로 손글씨 메모를 추가해보세요</div></div>`;return;}
+  const AC=['#7c6ff7','#22c98a','#f97316','#ec4899','#f59e0b','#60a5fa'];
+  document.getElementById('memoList').innerHTML=state.memos.map((m,i)=>`<div class="memo-list-item" onclick="openMemo('${m.id}')"><div class="memo-accent-bar" style="background:${AC[i%AC.length]}"></div><div class="memo-content"><div class="memo-title">${m.title||'제목 없는 메모'}</div><div class="memo-meta"><span class="memo-pages">📄 ${m.pageCount||1}페이지</span><span class="memo-date">${formatDate(m.updatedAt)}</span></div></div><div class="memo-delete-btn" onclick="event.stopPropagation();deleteMemo('${m.id}')">🗑</div></div>`).join('');
+}
+function formatDate(iso){if(!iso)return'';const d=new Date(iso),now=new Date(),diff=Math.floor((now-d)/86400000);if(diff===0)return`오늘 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;if(diff===1)return'어제';return`${d.getMonth()+1}월 ${d.getDate()}일`;}
+function deleteMemo(id){state.memos=state.memos.filter(m=>m.id!==id);save();renderMemos();}
+
+async function openCanvas(id){
+  editingMemoId=id||null;
+  document.getElementById('canvasPage').classList.add('open');
+  const titleInput=document.getElementById('canvasTitleInput');
+  if(id){
+    const meta=state.memos.find(m=>m.id===id);
+    titleInput.value=meta?(meta.title||''):'';
+    let pages=null;
+    if(window.loadMemoPages)pages=await window.loadMemoPages(id);
+    canvasPages=pages||(meta&&meta.pages)||[''];
+  } else {titleInput.value='';canvasPages=[''];}
+  currentCanvasPage=0;
+  setTimeout(()=>{initCanvasSize();drawPageContent();updatePageNav();setupCanvas();},150);
+}
+function openMemo(id){openCanvas(id);}
+function closeCanvas(){document.getElementById('canvasPage').classList.remove('open');}
+
+function initCanvasSize(){const canvas=document.getElementById('drawCanvas'),wrap=canvas.parentElement;canvas.width=wrap.offsetWidth;canvas.height=wrap.offsetHeight;}
+function drawPageContent(){
+  const canvas=document.getElementById('drawCanvas'),ctx=canvas.getContext('2d');
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);
+  const data=canvasPages[currentCanvasPage];
+  if(data){const img=new Image();img.onload=()=>ctx.drawImage(img,0,0);img.src=data;}
+}
+function saveCurrentPageData(){canvasPages[currentCanvasPage]=document.getElementById('drawCanvas').toDataURL('image/png');}
+function goToPage(idx){if(idx<0||idx>=canvasPages.length)return;saveCurrentPageData();currentCanvasPage=idx;drawPageContent();updatePageNav();}
+function addCanvasPage(){saveCurrentPageData();canvasPages.push('');currentCanvasPage=canvasPages.length-1;drawPageContent();updatePageNav();showToast(`페이지 ${currentCanvasPage+1} 추가됨`);}
+function deleteCanvasPage(){if(canvasPages.length===1){clearCanvas();return;}canvasPages.splice(currentCanvasPage,1);currentCanvasPage=Math.min(currentCanvasPage,canvasPages.length-1);drawPageContent();updatePageNav();showToast('페이지 삭제됨');}
+function updatePageNav(){
+  const total=canvasPages.length;
+  document.getElementById('pageIndicator').textContent=`${currentCanvasPage+1} / ${total}`;
+  document.getElementById('prevPageBtn').classList.toggle('disabled',currentCanvasPage===0);
+  document.getElementById('nextPageBtn').classList.toggle('disabled',currentCanvasPage===total-1);
+}
+function setupCanvas(){
+  const canvas=document.getElementById('drawCanvas');
+  canvas.onpointerdown=(e)=>{drawing=true;const r=canvas.getBoundingClientRect();lastX=e.clientX-r.left;lastY=e.clientY-r.top;canvas.setPointerCapture(e.pointerId);};
+  canvas.onpointermove=(e)=>{if(!drawing)return;const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,ctx=canvas.getContext('2d');ctx.beginPath();ctx.moveTo(lastX,lastY);ctx.lineTo(x,y);ctx.strokeStyle=isEraser?'#ffffff':penColor;ctx.lineWidth=isEraser?penSize*5:penSize;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();lastX=x;lastY=y;};
+  canvas.onpointerup=()=>{drawing=false;};
+}
+function selectPenSize(el,size){penSize=size;document.querySelectorAll('.pen-size').forEach(e=>e.classList.remove('selected'));el.classList.add('selected');}
+function selectColor(el,color){penColor=color;isEraser=false;document.getElementById('eraserBtn').classList.remove('active');document.querySelectorAll('.color-dot-tool').forEach(e=>e.classList.remove('selected'));el.classList.add('selected');}
+function toggleEraser(){isEraser=!isEraser;document.getElementById('eraserBtn').classList.toggle('active',isEraser);}
+function clearCanvas(){const canvas=document.getElementById('drawCanvas'),ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);}
+
+async function saveMemo(){
+  saveCurrentPageData();
+  const title=document.getElementById('canvasTitleInput').value.trim();
+  const pageCount=canvasPages.length;
+  const now=new Date().toISOString();
+  if(editingMemoId){
+    const m=state.memos.find(m=>m.id===editingMemoId);
+    if(m){m.title=title;m.pageCount=pageCount;m.pages=canvasPages;m.updatedAt=now;}
+  } else {
+    const nm={id:'m'+Date.now(),title,pageCount,pages:canvasPages,updatedAt:now};
+    state.memos.unshift(nm);
+    editingMemoId=nm.id;
+  }
+  // save to firebase
+  const m=state.memos.find(m=>m.id===editingMemoId);
+  if(m&&window.saveMemoDocToFirebase)await window.saveMemoDocToFirebase(m);
+  if(window.saveMemoListToFirebase)await window.saveMemoListToFirebase();
+  save();
+  closeCanvas();renderMemos();showToast('메모 저장됨 ✏️');
+}
+
+// MODAL
+function showModal(title,content){document.getElementById('modalTitle').textContent=title;document.getElementById('modalContent').innerHTML=content;document.getElementById('modalOverlay').classList.add('open');}
+function closeModal(e){if(e.target===document.getElementById('modalOverlay'))closeModalDirect();}
+function closeModalDirect(){document.getElementById('modalOverlay').classList.remove('open');}
+
+// TOAST
+let toastTimer;
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2400);}
+
+// UTILS
+function fmtDate(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+</script>
+</body>
+</html>
